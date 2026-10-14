@@ -1,5 +1,5 @@
 // 오프라인에서도 열리도록 앱 파일을 캐시. 파일을 고치면 VERSION을 올리기
-const VERSION = 'gymlog-v1';
+const VERSION = 'gymlog-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -12,7 +12,10 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(ASSETS)));
+  // cache: 'reload'로 브라우저 HTTP 캐시를 건너뛰고 항상 최신 파일을 받음
+  event.waitUntil(
+    caches.open(VERSION).then((cache) => cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
+  );
   self.skipWaiting();
 });
 

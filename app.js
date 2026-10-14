@@ -52,6 +52,28 @@ function saveDB() {
   }
 }
 
+// 설정 (기록과 따로 저장): 휴식 타이머 기본 시간, 자동 시작, 진행 중인 타이머
+const SETTINGS_KEY = 'gymlog.settings';
+
+function loadSettings() {
+  const defaults = { restSeconds: 90, autoRest: true, restEnd: 0, restTotal: 0 };
+  try {
+    return { ...defaults, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') };
+  } catch (e) {
+    return defaults;
+  }
+}
+
+const settings = loadSettings();
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch (e) {
+    // 설정은 못 저장해도 앱 사용에는 지장 없음
+  }
+}
+
 // 브라우저가 저장소를 임의로 비우지 않도록 요청
 if (navigator.storage && navigator.storage.persist) {
   navigator.storage.persist().catch(() => {});
@@ -121,11 +143,18 @@ const view = $('#view');
 const titleEl = $('#title');
 const subheader = $('#subheader');
 const headerAction = $('#header-action');
+const headerTimer = $('#header-timer');
 const fab = $('#fab');
+
+function updateFab() {
+  // 휴식 타이머가 떠 있으면 같은 자리에 있는 '운동 추가' 버튼은 숨김
+  fab.hidden = state.tab !== 'log' || !$('#rest').hidden;
+}
 
 function render() {
   document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
-  fab.hidden = state.tab !== 'log';
+  headerTimer.hidden = state.tab !== 'log';
+  updateFab();
   if (state.tab === 'log') renderLog();
   else if (state.tab === 'calendar') renderCalendar();
   else renderExport();
@@ -325,7 +354,7 @@ function makeCSV(records) {
 }
 
 function renderExport() {
-  titleEl.textContent = '내보내기';
+  titleEl.textContent = '설정';
   headerAction.hidden = true;
   subheader.innerHTML = '';
 
@@ -334,7 +363,21 @@ function renderExport() {
   const preview = csv.split('\n').slice(0, 8).join('\n');
 
   view.innerHTML = `
-    <div class="group-label">기간</div>
+    <div class="group-label">휴식 타이머</div>
+    <div class="card list">
+      <label class="list-row"><span>세트 완료하면 자동 시작</span><input type="checkbox" class="switch" data-setting="autoRest" ${settings.autoRest ? 'checked' : ''}></label>
+      <div class="list-row">
+        <span>기본 휴식 시간</span>
+        <div class="stepper">
+          <button data-act="rest-default" data-n="-15" aria-label="15초 줄이기" ${settings.restSeconds <= 15 ? 'disabled' : ''}>−</button>
+          <b>${fmtClock(settings.restSeconds)}</b>
+          <button data-act="rest-default" data-n="15" aria-label="15초 늘리기" ${settings.restSeconds >= 600 ? 'disabled' : ''}>＋</button>
+        </div>
+      </div>
+    </div>
+    <p class="footnote">기록 화면 왼쪽 위 '휴식' 버튼으로 직접 시작할 수도 있어요.</p>
+
+    <div class="group-label">내보내기 기간</div>
     <div class="card list">
       <label class="list-row"><span>기간 지정</span><input type="checkbox" class="switch" data-export="limit" ${state.exportLimit ? 'checked' : ''}></label>
       ${state.exportLimit ? `
@@ -368,6 +411,11 @@ function renderExport() {
 }
 
 view.addEventListener('change', (e) => {
+  if (e.target.dataset.setting === 'autoRest') {
+    settings.autoRest = e.target.checked;
+    saveSettings();
+    return;
+  }
   const el = e.target.closest('[data-export]');
   if (!el) return;
   const key = el.dataset.export;
@@ -452,6 +500,7 @@ document.addEventListener('click', (e) => {
       saveDB();
       row.classList.toggle('done', set.done);
       btn.innerHTML = set.done ? ICON.checkOn : ICON.checkOff;
+      if (set.done && settings.autoRest) startRest();
       break;
     }
     case 'add-set': {
@@ -486,6 +535,11 @@ document.addEventListener('click', (e) => {
       state.tab = 'log';
       render();
       window.scrollTo(0, 0);
+      break;
+    case 'rest-default':
+      settings.restSeconds = Math.min(600, Math.max(15, settings.restSeconds + Number(btn.dataset.n)));
+      saveSettings();
+      render();
       break;
     case 'export-csv':
       exportCSV();
@@ -655,6 +709,120 @@ function addSelected() {
   render();
 }
 
+// ---------- 휴식 타이머 ----------
+// 남은 시간은 '끝나는 시각'으로 계산해서, 화면이 꺼졌다 켜져도 정확하게 유지됨
+
+const restEl = $('#rest');
+const restTime = $('#rest-time');
+const restLabel = $('#rest-label');
+const restFill = $('#rest-fill');
+let restTick = null;
+let restHideTimer = null;
+let audioCtx = null;
+
+const fmtClock = (sec) => `${Math.floor(sec / 60)}:${pad(sec % 60)}`;
+
+function startRest(seconds = settings.restSeconds) {
+  unlockAudio();
+  settings.restTotal = seconds;
+  settings.restEnd = Date.now() + seconds * 1000;
+  saveSettings();
+  showRest();
+}
+
+function showRest() {
+  clearTimeout(restHideTimer);
+  clearInterval(restTick);
+  restEl.hidden = false;
+  restEl.classList.remove('finished');
+  restLabel.textContent = '휴식';
+  updateFab();
+  updateRest();
+  restTick = setInterval(updateRest, 250);
+}
+
+function updateRest() {
+  const left = Math.max(0, Math.ceil((settings.restEnd - Date.now()) / 1000));
+  restTime.textContent = fmtClock(left);
+  restFill.style.transform = `scaleX(${settings.restTotal ? Math.min(1, left / settings.restTotal) : 0})`;
+  if (left === 0) finishRest();
+}
+
+function finishRest() {
+  clearInterval(restTick);
+  restTick = null;
+  settings.restEnd = 0;
+  saveSettings();
+  restEl.classList.add('finished');
+  restLabel.textContent = '휴식 끝';
+  restTime.textContent = '다음 세트!';
+  restFill.style.transform = 'scaleX(0)';
+  beep();
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  restHideTimer = setTimeout(hideRest, 5000);
+}
+
+function hideRest() {
+  clearTimeout(restHideTimer);
+  clearInterval(restTick);
+  restTick = null;
+  settings.restEnd = 0;
+  saveSettings();
+  restEl.hidden = true;
+  restEl.classList.remove('finished');
+  updateFab();
+}
+
+restEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-rest]');
+  if (!btn) return;
+  const action = btn.dataset.rest;
+  if (action === 'stop' || !settings.restEnd) {
+    hideRest();
+    return;
+  }
+  const delta = Number(action);
+  settings.restEnd = Math.max(Date.now(), settings.restEnd + delta * 1000);
+  settings.restTotal = Math.max(1, settings.restTotal + delta);
+  saveSettings();
+  updateRest();
+});
+
+headerTimer.addEventListener('click', () => startRest());
+
+// iOS는 사용자가 화면을 누른 순간에만 소리를 켤 수 있어서, 타이머 시작 시점에 미리 준비
+function unlockAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) {
+    audioCtx = null;
+  }
+}
+
+function beep() {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  [0, 0.25, 0.5].forEach((offset) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, t0 + offset);
+    gain.gain.exponentialRampToValueAtTime(0.3, t0 + offset + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + offset + 0.18);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0 + offset);
+    osc.stop(t0 + offset + 0.2);
+  });
+}
+
+// 앱을 껐다 켜도 진행 중이던 타이머 이어가기
+if (settings.restEnd > Date.now()) showRest();
+else if (settings.restEnd) {
+  settings.restEnd = 0;
+  saveSettings();
+}
+
 // ---------- 기타 ----------
 
 let toastTimer;
@@ -670,6 +838,8 @@ function toast(message) {
 let lastToday = todayStr();
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  // 다른 앱을 보다가 돌아왔을 때 휴식 타이머 상태를 바로 맞춤
+  if (settings.restEnd) updateRest();
   const now = todayStr();
   if (now !== lastToday) {
     if (state.date === lastToday) state.date = now;
@@ -679,6 +849,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  // 새 버전이 설치되면 한 번 새로고침해서 바로 반영 (처음 설치할 때는 제외)
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (hadController) location.reload();
+  });
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 

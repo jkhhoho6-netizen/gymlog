@@ -74,6 +74,16 @@ input { font: inherit; color: inherit; }
 }
 .title-row h1 { margin: 0; font-size: 17px; font-weight: 600; }
 .title-row .pill { justify-self: end; }
+.title-row .timer-pill { justify-self: start; }
+
+.timer-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 6px 9px;
+  color: var(--accent);
+}
+.timer-pill svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
 .pill {
   padding: 6px 14px;
@@ -216,6 +226,63 @@ main {
   margin: 0 auto;
   z-index: 15;
   box-shadow: 0 6px 20px rgba(255, 107, 60, 0.35);
+}
+
+/* ---------- 휴식 타이머 ---------- */
+
+.rest {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px);
+  max-width: 528px;
+  margin: 0 auto;
+  z-index: 15;
+  background: var(--card);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.rest-track { height: 4px; background: var(--fill); }
+.rest-fill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform 0.25s linear;
+}
+.rest-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+.rest-time { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.rest-time small { font-size: 11px; color: var(--sub); }
+.rest-time b { font-size: 26px; font-variant-numeric: tabular-nums; }
+.rest-btn {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  font-size: 14px;
+  font-weight: 500;
+}
+.rest-btn.strong { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.rest.finished { background: var(--accent); color: #fff; }
+.rest.finished .rest-time small { color: rgba(255, 255, 255, 0.85); }
+.rest.finished .rest-btn { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+.stepper { display: flex; align-items: center; gap: 12px; }
+.stepper b { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.stepper button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--fill);
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1;
 }
 
 /* ---------- 탭 바 ---------- */
@@ -467,7 +534,7 @@ pre.preview {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 80px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 96px);
   transform: translateX(-50%);
   z-index: 60;
   background: rgba(30, 30, 30, 0.92);

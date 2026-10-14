@@ -18,7 +18,10 @@
 <body>
   <header class="topbar">
     <div class="title-row">
-      <span></span>
+      <button id="header-timer" class="pill timer-pill" hidden aria-label="휴식 타이머 시작">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7.5"/><path d="M12 10.5V14l2.5 1.5M9.5 3h5M12 3v3.5"/></svg>
+        <span>휴식</span>
+      </button>
       <h1 id="title">운동기록</h1>
       <button id="header-action" class="pill" hidden></button>
     </div>
@@ -28,6 +31,19 @@
   <main id="view"></main>
 
   <button id="fab" class="primary fab" hidden>＋ 운동 추가</button>
+
+  <div id="rest" class="rest" hidden>
+    <div class="rest-track"><div id="rest-fill" class="rest-fill"></div></div>
+    <div class="rest-row">
+      <button class="rest-btn" data-rest="-15">−15초</button>
+      <div class="rest-time">
+        <small id="rest-label">휴식</small>
+        <b id="rest-time">0:00</b>
+      </div>
+      <button class="rest-btn" data-rest="15">+15초</button>
+      <button class="rest-btn strong" data-rest="stop">건너뛰기</button>
+    </div>
+  </div>
 
   <nav class="tabbar">
     <button class="tab" data-tab="log">
@@ -39,8 +55,8 @@
       <span>캘린더</span>
     </button>
     <button class="tab" data-tab="export">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
-      <span>내보내기</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>설정</span>
     </button>
   </nav>
 
